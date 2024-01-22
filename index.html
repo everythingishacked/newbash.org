@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+    <title>NQDB</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script>
+        var quotes = [];
+        var currentPage = 1;
+        var rowsPerPage = 50;
+
+        $(document).ready(function() {
+            $.ajax({
+                url: 'quotes.json',
+                method: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    quotes = data;
+
+                    var urlParts = window.location.href.split('?');
+                    if (urlParts.length > 1) {
+                        showQuote(urlParts[1]);
+                    }
+                }
+            });
+
+            $('#searchNum').keypress(function (e) {
+                if (e.which == 13) {
+                    goToQuote(e.target.value);
+                }
+            });
+
+            $('#searchTerm').keypress(function (e) {
+                if (e.which == 13) {
+                    searchQuotes();
+                }
+            });
+
+            $('#prev-link').on('click', function() {
+                if (currentPage > 1) {
+                    currentPage--;
+                    showPage(currentPage);
+                }
+            });
+
+            $('#next-link').on('click', function() {
+                var totalPages = Math.ceil($('#quotes tr').length / rowsPerPage);
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    showPage(currentPage);
+                }
+            });
+        });
+
+        function hideAll() {
+            $('#quotes').hide();
+            $('#home-text').hide();
+            $('#search').hide();
+            $('#pages').hide();
+        }
+
+        function goHome() {
+            hideAll();
+            $('#home-text').show();
+            var baseUrl = window.location.href.split('?')[0].replace(/#/, "");
+            window.history.replaceState({}, "", baseUrl);
+        }
+
+        function showSearch() {
+            hideAll();
+            $('#search').show();
+            $('#searchTerm').select();
+        }
+
+        function findMatches(term) {
+            var matchingSubset = [];
+            $.each(quotes, function (i, quote) {
+                if (quote['text'].includes(term)) {
+                    matchingQuotes.push(quote);
+                }
+            });
+            return matchingSubset;
+        }
+
+        function goToQuote(i) {
+            var url = window.location.href.split('?')[0];
+            window.location.replace(`${url}?${i}`);
+        }
+
+        function showQuote(param) {
+            var id = parseInt(param);
+            var match = quotes.filter(q => { return q.id === id })
+            addQuotes(match);
+        }
+
+        function showQuotes(n) {
+            addQuotes(quotes, n);
+        }
+
+        function showTopQuotes(n) {
+            rowsPerPage = n || 50;
+            var topQuotes = [...quotes];
+            topQuotes.sort(function(a,b) { return b.votes - a.votes; });
+            if (n) {
+                topQuotes = topQuotes.slice(0, n);
+            }
+            addQuotes(topQuotes, rowsPerPage);
+        }
+
+        function showRandomQuotes(onlyPositive=0) {
+            var quotesToUse = [...quotes];
+            if (onlyPositive > 0) {
+                quotesToUse = quotesToUse.filter(q => { return q.votes > 0 })
+            }
+            var someQuotes = [];
+            for (i=0; i<50; i++) {
+                var randomQuote = quotesToUse[Math.floor(Math.random() * quotesToUse.length)];
+                someQuotes.push(randomQuote);
+            }
+            addQuotes(someQuotes);
+        }
+
+        function addQuotes(someQuotes, paginate=50) {
+            hideAll();
+            var quoteList = $('#quotes');
+            quoteList.empty();
+            someQuotes.forEach(function(q) {
+                if (q.id) {
+                    var row = `<tr><td valign="top"><p class="quote"><a onclick="goToQuote(${q.id})" title="Permanent link to this quote."><b>#${q.id}</b></a> <a class="qa">+</a>(<font color="${q.votes > 0 ? 'green' : 'red'}">${q.votes}</font>)<a class="qa">-</a> <a onclick="return confirm('Flag quote for review?');" class="qa">[X]</a></p><p class="qt">${q.text}</p></td></tr>`;
+                    quoteList.append(row);
+                }
+            });
+
+            if (quoteList[0].children.length > paginate) {
+                currentPage = 1;
+                showPage(currentPage, paginate);
+            }
+            quoteList.show();
+        }
+
+        function showPage(page, n) {
+            if (n) {
+                rowsPerPage = n;
+            }
+            var start = (page - 1) * rowsPerPage;
+            var end = start + rowsPerPage;
+
+            $('#quotes tr').hide();
+            $('#quotes tr').slice(start, end).show();
+            $('#page-counter').text(page);
+
+            $('#prev').toggle(currentPage !== 1);
+            $('#next').toggle(currentPage !== Math.ceil($('#quotes tr').length / rowsPerPage));
+
+            $('#pages').show();
+            $('html,body').scrollTop(0);
+        }
+
+        function searchQuotes() {
+            var query = $("#searchTerm")[0].value;
+            var sortBy = $("#searchSort")[0].value;
+            var count = parseInt($("#searchLimit")[0].value);
+            var matches = quotes.filter(q => { return q.text.indexOf(query) > -1 });
+            if (sortBy == "0") { // Score
+                matches.sort(function(a,b) { return b.votes - a.votes; });
+            } else if (sortBy == "1") { // Number
+                matches.sort(function(a,b) { return a.id - b.id; });
+            }
+            addQuotes(matches, count);
+        }
+
+</script>
+</head>
+<body>
+<center style="display:block;text-align:-webkit-center;">
+    <table border="0" cellpadding="2" cellspacing="0" width="80%">
+        <tbody><tr>
+            <td align="left" bgcolor="#c08000" style="text-align:-webkit-left;">
+                    <font size="+1" style="font-size:18px;"><b style="font-weight:700;"><i style="font-style:italic;">NQDB</i></b></font>
+                </td>
+                <td align="right" bgcolor="#c08000" style="text-align:-webkit-right;">
+                    <font face="arial" size="+1" style="font-family:arial;font-size:18px;"><b style="font-weight:700;">newbash.org</b></font><br></td>
+            </tr></tbody></table>
+            <table border="0" cellpadding="2" cellspacing="0" width="80%">
+            <tbody><tr>
+                <td align="left" bgcolor="#f0f0f0" class="tdheader">
+            <a href="https://youtube.com/@EverythingIsHacked" target="_blank">Don't Pay Me</a></td><td align="right" bgcolor="#f0f0f0" colspan="2" id="menu-right">
+            <a onclick="goHome()">Home</a>
+            / <a onclick="showTopQuotes(100)">Top 100</a><a onclick="showTopQuotes(200)">-200</a>
+            / <a onclick="showRandomQuotes()">Random</a> <a onclick="showRandomQuotes(1)">&gt;0</a>
+            / <a onclick="showTopQuotes()">Browse</a>
+            / <a onclick="showQuotes(50)">Latest</a>
+            / <a onclick="showSearch()">Search</a> / <font style="color:rgb(0, 0, 0);font-family:arial, helvetica, sans-serif;">#</font> <input id="searchNum" size="6" type="text" class="search" />
+        </td></tr></tbody>
+    </table>
+
+    <span id="home-text">
+        <p></p>
+        <table id="home" cellpadding="0" cellspacing="3" width="80%">
+            <tbody><tr>
+                <td class="bodytext" valign="top" width="60%">
+                    <b>Welcome!</b> This is an unofficial ~mirror of the bash.org IRC quotes.
+                    <p>I ran a company called Hunter2. Now I make ridiculous things through <a href="https://youtube.com/@EverythingIsHacked" target="_blank">Everything Is Hacked.</a></p>
+                    <p>When I learned that bash.org was probably no more, I put on my robe and wizard hat.</p>
+                    <p>Warning for the uninitiated: many of these quotes are wildly offensive.<br>This in an uncensored snapshot of internet history.</p>
+                    <p>Take a look at the <a onclick="showTopQuotes(100)">Top 100</a> to get started.</p>
+                    <hr>
+                    <p>I have no affiliation with or knowledge of the original bash.org maintainer(s?) but hope that this homage is appreciated. It's a Single Page Application, utilizing cutting edge Internet technologies including <i>jQuery</i> and <i>CSS</i>.</p>
+                </td>
+                <td class="bodytext" valign="top" width="40%"></td>
+                </tr></tbody>
+        </table>
+    </span>
+
+    <span id="search">
+        <p></p>
+        <table cellpadding="2" cellspacing="0" class="search-table">
+            <tbody><tr>
+                <td><input id="searchTerm" type="text" name="search" size="30" class="text"></td>
+                <td><input onclick="searchQuotes()" type="submit" value="Search" class="button"></td>
+            </tr>
+            <tr>
+                <td class="bodytext">Type in the search word,<br>apply pressure to button,<br>then read the results.</td>
+            <td class="bodytext">Sort by:<br>
+                <select id="searchSort" name="sort" class="select">
+                    <option value="0" selected="">Score</option>
+                    <option value="1">Number</option>
+                </select>
+            </td>
+            <td class="bodytext">Show:<br>
+                <select id="searchLimit" name="show">
+                    <option value="10">10</option>
+                    <option value="25" selected="">25</option>
+                    <option value="50">50</option>
+                    <option value="75">75</option>
+                    <option value="100">100</option>
+                </select>
+            </td>
+            </tr></tbody>
+        </table>
+    </span>
+
+    <table cellpadding="2" cellspacing="0" width="80%">
+        <tbody id="quotes">
+        </tbody>
+    </table>
+
+    <div id="pages">
+        <span id="prev"><a id="prev-link">&lt;</a> ... </span>
+        <span id="page-counter"></span>
+        <span id="next"> ... <a id="next-link">&gt;</a></span>
+    </div>
+
+    <footer>
+    <table border="0" cellpadding="2" cellspacing="0" width="80%" bgcolor="#c08000">
+        <tbody>
+            <tr><td class="footertext" align="right"> 21092 quotes harvested</td></tr>
+        </tbody>
+    </table>
+    <font size="-1">
+        Hosted by <a href="https://youtube.com/@EverythingIsHacked" target="_blank">Everything Is Hacked</a> on <a href="https://github.com/everythingishacked/newbash.org" target="_blank">GitHub Pages</a>.
+        <br>
+        No affiliation with Idologic or QDB. No Rights Reserved.
+    </font>
+    </footer>
+
+</center>
+</body>
+</html>
