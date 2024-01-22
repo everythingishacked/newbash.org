@@ -144,6 +144,7 @@ a {
     font-family: courier new, lucida console, fixed;
     font-size: 10pt;
     margin: 0;
+    text-wrap: wrap;
 }
 
 .quote {
